@@ -1,7 +1,6 @@
 const csvjson = require('csvjson')
 const fs = require('fs')
 const process = require('process')
-
 class Biofile {
     constructor (name, sex, age, height, weight){
         this.name = name
@@ -12,45 +11,58 @@ class Biofile {
     }
 }
 const args = process.argv.slice(2)
-const data = fs.readFileSync('biostats.csv', { encoding : 'utf8'}) 
-let options = {
-  delimiter : ',', 
-  quote     : '"',
+const readCsv = (path) => {
+    const data = fs.readFileSync(path, { encoding : 'utf8'}) 
+    let options = {
+      delimiter : ',', 
+      quote     : '"',
+    }
+    return csvjson.toObject(data,options)
 }
-const csvArray = csvjson.toObject(data,options)
-const writeData = (csvArray) => {
+const csvArray = readCsv('biostats.csv')
+let csvMap = new Map(csvArray.map((elem) => [elem.name, elem] ))
+const writeData = (csvMap) => {
     let options = {
         delimiter   : ",",
         wrap        : false,
         headers: "key"
     }
-    fs.writeFileSync('biostats.csv',csvjson.toCSV(csvArray, options), err => {
+    fs.writeFileSync('biostats.csv',csvjson.toCSV(Array.from(csvMap.values()), options), err => {
         if (err) {
           console.error(err)
         }
       })
 }
+const createData = (mapbio, bioobject) => {
+    let storedData = mapbio
+    storedData.set(bioobject.name,bioobject)
+    return storedData
+}
+const readData = (name,mapbio) => {
+    return mapbio.get(name)
+}
+const updateData = (mapbio, bioobject) => {
+    return mapbio.set(bioobject.name,bioobject)
+}
+const deleteData = (name,mapbio) => {
+    return mapbio.delete(name)
+}
 if (args[0] === '-c'){
     const [, name,sex,age,height,weight] = args
     const createObject = new Biofile(name,sex,age,height, weight)
-    csvArray.push(createObject)
-    writeData (csvArray)
-    console.log(csvArray)
-   
-
+    csvMap = createData(csvMap, createObject)
+    writeData (csvMap)
 }else if(args[0] === '-r'){
     const name = args[1]
-    let csvFindArray = csvArray.filter(filters => filters.name === name)
-    console.log(`name: ${csvFindArray[0].name} \nsex: ${csvFindArray[0].sex} \nage: ${csvFindArray[0].age}\nheight: ${csvFindArray[0].height} in or ${(csvFindArray[0].height / 2.205).toFixed(2)} cm \nweight: ${csvFindArray[0].weight} lbs or ${csvFindArray[0].weight * 2.54} kg`)
+    let csvFindArray = readData(name,csvMap)
+    console.log(`name: ${csvFindArray.name} \nsex: ${csvFindArray.sex} \nage: ${csvFindArray.age}\nheight: ${csvFindArray.height} in or ${(csvFindArray.height / 2.205).toFixed(2)} cm \nweight: ${csvFindArray.weight} lbs or ${csvFindArray.weight * 2.54} kg`)
 }else if(args[0] === '-u'){
     const [, name,sex,age,height,weight] = args
-    let csvFindArray = csvArray.filter(filters => filters.name !== name)
     const createObject = new Biofile(name, sex, age, height, weight)
-    csvFindArray.push(createObject)
-    writeData (csvFindArray)
-    console.log(csvFindArray)
+    csvMap = updateData(csvMap,createObject)
+    writeData (csvMap)
 }else if(args[0] === '-d'){
     const name = args[1]
-    let csvArrayCopy = csvArray.filter(bio => bio.name !== name)
-    writeData (csvArrayCopy) 
+    deleteData (name, csvMap)
+    writeData (csvMap) 
 }
